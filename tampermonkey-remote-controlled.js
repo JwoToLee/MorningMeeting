@@ -127,8 +127,27 @@
                 }, 2000);
             };
             scriptElement.onerror = function() {
-                console.error('❌ Failed to load main script');
-                showMessage('📥 Load Error', 'Failed to load main script components.', 'error');
+                console.error('❌ Failed to load clean script, trying fallback...');
+                
+                // Try loading the original script as fallback
+                const fallbackScript = document.createElement('script');
+                const fallbackUrl = URLS.mainScript.replace('car-extractor-clean.js', 'car-extractor-main.js');
+                fallbackScript.src = fallbackUrl + '?t=' + Date.now();
+                
+                fallbackScript.onload = function() {
+                    console.log('✅ Fallback script loaded successfully');
+                    mainScriptLoaded = true;
+                    setTimeout(() => {
+                        hideMessage();
+                    }, 2000);
+                };
+                
+                fallbackScript.onerror = function() {
+                    console.error('❌ Both scripts failed to load');
+                    showMessage('📥 Load Error', 'Failed to load main script components. Please check your internet connection and try refreshing the page.', 'error');
+                };
+                
+                document.head.appendChild(fallbackScript);
             };
             
             document.head.appendChild(scriptElement);
@@ -209,6 +228,8 @@
         console.log('🔐 HAESL CAR Extractor - Remote Access Control System');
         console.log(`👤 User ID: ${USER_ID}`);
         console.log('🔗 Checking GitHub repository for access...');
+        console.log('📍 Access Control URL:', URLS.accessControl);
+        console.log('📍 Main Script URL:', URLS.mainScript);
         
         const hasAccess = await checkAccess();
         

@@ -11,8 +11,10 @@ let currentIndex = 0;
 let totalCars = 0;
 let ribbonMinimized = false;
 
-// Add styles for the ribbon
-GM_addStyle(`
+// Add styles for the ribbon (using regular CSS injection instead of GM_addStyle)
+function addStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
     #carRibbon {
         position: fixed;
         left: 0;
@@ -218,7 +220,9 @@ GM_addStyle(`
     .car-row-context-menu .menu-item:hover {
         background: #30363d;
     }
-`);
+    `;
+    document.head.appendChild(style);
+}
 
 // Create the ribbon interface
 function createRibbon() {
@@ -651,6 +655,9 @@ window.removeCarData = removeCarData;
 // Initialize when page loads
 function initialize() {
     console.log('🚀 HAESL CAR Extractor initialized');
+    
+    // Add CSS styles first
+    addStyles();
     
     // Wait for page to be ready
     if (document.readyState === 'loading') {
