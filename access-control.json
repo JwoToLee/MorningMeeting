@@ -3,14 +3,7 @@
   "enabled": true,
   "lastUpdated": "2025-09-02T00:00:00Z",
   "authorizedUsers": [
-    {
-      "id": "all_users",
-      "name": "Temporary All Access",
-      "email": "temp@access.com",
-      "enabled": true,
-      "expires": "2025-09-04T23:59:59Z",
-      "permissions": ["extract", "export", "refresh"]
-    },
+
     {
       "id": "TUFWTzVH",
       "name": "Bryce Lee",

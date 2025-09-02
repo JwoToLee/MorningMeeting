@@ -1,0 +1,31 @@
+HAESL CAR Batch Extractor - Installation Instructions
+====================================================
+
+FOR COLLEAGUES RECEIVING THE PROTECTED SCRIPT:
+
+1. Install Tampermonkey browser extension if not already installed
+2. Open Tampermonkey Dashboard (click the extension icon)
+3. Click "Create a new script"
+4. Delete all default content
+5. Copy and paste the entire content of car-extractor-protected.js
+6. Save the script (Ctrl+S)
+7. Enable the script (toggle should be ON)
+8. Navigate to HAESL reporting page to use
+
+USAGE:
+- The script will appear as a dark ribbon on the left side
+- Use the buttons to extract CAR data
+- Right-click individual entries to refresh
+- Use the minimize button (-) to hide the ribbon
+
+IMPORTANT:
+- This script is protected and cannot be modified
+- Do not attempt to edit or debug the code
+- Contact the script author for updates or issues
+- The script only works on HAESL domains
+
+TROUBLESHOOTING:
+- If script doesn't load, disable and re-enable it
+- Clear browser cache if issues persist  
+- Make sure you're on the correct HAESL page
+- Check that Tampermonkey has permissions for the site

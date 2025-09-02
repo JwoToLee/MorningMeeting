@@ -1,0 +1,122 @@
+// ==UserScript==
+// @name         Workflow Data Proper Inline Panel
+// @namespace    http://tampermonkey.net/
+// @version      5.0
+// @description  Displays filtered workflow data in an inline panel at the top of the page
+// @match        https://haesl.gaelenlighten.com/*
+// @grant        GM_addStyle
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Create inline panel to display data
+    var panel = document.createElement("div");
+    panel.id = "workflow-panel";
+    panel.innerHTML = `
+        <div id="workflow-data">Loading data...</div>
+        <button id="refresh-data" style="margin-left: 20px; padding: 5px 10px; font-size: 12px; cursor: pointer;">🔄 Refresh</button>
+    `;
+    document.body.prepend(panel); // Place the panel at the very top of the page
+
+    // Add CSS for the inline panel
+    GM_addStyle(`
+        #workflow-panel {
+            position: static; /* Inline with content */
+            width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            text-align: center;
+            z-index: 9999;
+            overflow-x: auto;
+            white-space: nowrap;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.5);
+        }
+        #workflow-data {
+            display: inline-block;
+            margin: 0;
+            padding: 0;
+        }
+        #refresh-data {
+            background: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        #refresh-data:hover {
+            background: #005A9E;
+        }
+    `);
+
+    // Function to extract workflow data
+    function displayWorkflowData() {
+        // Extract the CAR ID (e.g., "CAR-1229")
+        const headingElement = document.querySelector('.g-subheading__title h1');
+        const gHeading = headingElement ? headingElement.textContent.trim() : '';
+        const carID = gHeading.match(/CAR-\d+/)?.[0] || 'CAR ID Not Found';
+
+        const stages = document.querySelectorAll("li.stage-li"); // Find all stage elements
+        const stageNames = ["Monitor", "Investigation", "QA Follow Up", "HQA Closure"]; // Renamed stages
+        const results = [];
+
+        stages.forEach((stage, index) => {
+            const stageName = stageNames[index] || `Stage ${index + 1}`; // Use renamed stages or fallback to generic numbering
+
+            function findSiblingData(labelText) {
+                const label = Array.from(stage.querySelectorAll('div.details-label'))
+                    .find(el => el.textContent.trim() === labelText);
+                if (label && label.nextElementSibling) {
+                    const staticText = label.nextElementSibling.querySelector('.staticText');
+                    return staticText ? staticText.textContent.trim() : label.nextElementSibling.textContent.trim();
+                }
+                return null; // Return null if no data found
+            }
+
+            function findStaticTextData(labelText) {
+                const label = Array.from(stage.querySelectorAll('div.details-label'))
+                    .find(el => el.textContent.trim() === labelText);
+                if (label && label.nextElementSibling) {
+                    const staticTextContainer = label.nextElementSibling.querySelector('.staticTextContainer');
+                    return staticTextContainer ? staticTextContainer.textContent.trim() : null;
+                }
+                return null; // Return null if no data found
+            }
+
+            const statusText = findSiblingData("Status:")?.toLowerCase().trim() || "unknown"; // Normalize the status text
+            const ownerText = findSiblingData("Stage Owner:") || "Unknown";
+            const completedDateText = findSiblingData("Completed date");
+            const targetDateText = findStaticTextData("Target Date");
+
+            // Include only the "In Progress" stage in the display
+            if (statusText === "in progress") { // Match normalized "In Progress"
+                const date = completedDateText || targetDateText; // Use either completed or target date (whichever exists)
+                let stageData = `${carID}, ${stageName}, ${ownerText}`;
+                if (date) stageData += `, ${date}`;
+
+                // Clean up extraneous strings and spaces
+                stageData = stageData.replace(/Cancel|Save/g, '').trim();
+
+                results.push(stageData);
+            }
+        });
+
+        // Update the inline panel with results
+        const workflowDataDiv = document.getElementById("workflow-data");
+        if (results.length > 0) {
+            workflowDataDiv.textContent = results.join(" | "); // Separate entries with a " | "
+        } else {
+            workflowDataDiv.textContent = "No In Progress data found.";
+        }
+    }
+
+    // Automatically display workflow data after a delay
+    setTimeout(displayWorkflowData, 3000); // Wait for 3 seconds before running the script
+
+    // Add event listener for manual refresh
+    document.getElementById("refresh-data").addEventListener("click", () => {
+        displayWorkflowData(); // Manually refresh data
+    });
+})();
