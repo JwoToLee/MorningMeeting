@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "lastUpdated": "2025-09-02T00:00:00Z",
+  "authorizedUsers": [
+    {
+      "id": "user001",
+      "name": "John Doe",
+      "email": "john.doe@company.com",
+      "enabled": true,
+      "expires": "2025-12-31T23:59:59Z",
+      "permissions": ["extract", "export", "refresh"]
+    },
+    {
+      "id": "user002", 
+      "name": "Jane Smith",
+      "email": "jane.smith@company.com",
+      "enabled": true,
+      "expires": "2025-12-31T23:59:59Z",
+      "permissions": ["extract", "export"]
+    }
+  ],
+  "globalSettings": {
+    "maxCarsPerSession": 50,
+    "rateLimitDelay": 2000,
+    "debugMode": false,
+    "maintenanceMode": false,
+    "maintenanceMessage": "System is under maintenance. Please try again later."
+  },
+  "messages": {
+    "welcome": "HAESL CAR Extractor v1.0 - Authorized Access",
+    "unauthorized": "Access denied. Please contact the administrator.",
+    "expired": "Your access has expired. Please contact the administrator.",
+    "maintenance": "System maintenance in progress. Please try again later."
+  }
+}
