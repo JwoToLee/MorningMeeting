@@ -21,7 +21,7 @@
         repo: 'MorningMeeting',               // Your repository name
         branch: 'main',                       // Branch name
         accessControlFile: 'access-control.json',
-        mainScriptFile: 'car-extractor-main.js'
+        mainScriptFile: 'car-extractor-clean.js'  // Use clean version without anti-tampering
     };
     
     // Generate URLs
@@ -115,42 +115,23 @@
         try {
             console.log('📥 Loading main script from GitHub...');
             
-            const response = await fetch(URLS.mainScript + '?t=' + Date.now(), {
-                cache: 'no-cache'
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Script load failed: ${response.status}`);
-            }
-            
-            let scriptCode = await response.text();
-            
-            // Remove UserScript headers if present
-            scriptCode = scriptCode.replace(/\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==\s*/, '');
-            
-            // Remove the outer function wrapper
-            scriptCode = scriptCode.replace(/^\(function\(\)\s*{\s*['"]use strict['"];\s*/, '');
-            scriptCode = scriptCode.replace(/\}\)\(\);?\s*$/, '');
-            
-            // Execute the script
+            // Create script element to load directly from GitHub
             const scriptElement = document.createElement('script');
-            scriptElement.textContent = `
-                (function() {
-                    'use strict';
-                    console.log('🚀 Executing main CAR extractor script...');
-                    ${scriptCode}
-                })();
-            `;
+            scriptElement.src = URLS.mainScript + '?t=' + Date.now();
+            scriptElement.onload = function() {
+                console.log('✅ Main script loaded successfully');
+                mainScriptLoaded = true;
+                // Update status message
+                setTimeout(() => {
+                    hideMessage();
+                }, 2000);
+            };
+            scriptElement.onerror = function() {
+                console.error('❌ Failed to load main script');
+                showMessage('📥 Load Error', 'Failed to load main script components.', 'error');
+            };
             
             document.head.appendChild(scriptElement);
-            mainScriptLoaded = true;
-            
-            console.log('✅ Main script loaded successfully');
-            
-            // Update status message
-            setTimeout(() => {
-                hideMessage();
-            }, 2000);
             
         } catch (error) {
             console.error('❌ Failed to load main script:', error);

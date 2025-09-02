@@ -136,28 +136,30 @@
 
     // Load main script if access is granted
     function loadMainScript() {
-        const mainScriptUrl = 'https://raw.githubusercontent.com/JwoToLee/MorningMeeting/main/car-extractor-main.js';
+        addDebugLine(`ACCESS GRANTED - Loading clean script version...`, 'success');
         
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: mainScriptUrl + '?t=' + Date.now(),
-            onload: function(response) {
-                if (response.status === 200) {
-                    addDebugLine(`Main script loaded successfully`, 'success');
-                    try {
-                        eval(response.responseText);
-                        addDebugLine(`Main script executed`, 'success');
-                    } catch (e) {
-                        addDebugLine(`Error executing main script: ${e.message}`, 'error');
-                    }
-                } else {
-                    addDebugLine(`Failed to load main script: ${response.status}`, 'error');
-                }
-            },
-            onerror: function(error) {
-                addDebugLine(`Error loading main script: ${error}`, 'error');
-            }
-        });
+        // Load the clean version without anti-tampering
+        const script = document.createElement('script');
+        script.src = 'https://raw.githubusercontent.com/JwoToLee/MorningMeeting/main/car-extractor-clean.js?t=' + Date.now();
+        script.onload = function() {
+            addDebugLine(`Clean main script loaded successfully`, 'success');
+        };
+        script.onerror = function() {
+            addDebugLine(`Error loading clean script, trying original...`, 'error');
+            
+            // Fallback to original
+            const fallbackScript = document.createElement('script');
+            fallbackScript.src = 'https://raw.githubusercontent.com/JwoToLee/MorningMeeting/main/car-extractor-main.js?t=' + Date.now();
+            fallbackScript.onload = function() {
+                addDebugLine(`Fallback script loaded`, 'success');
+            };
+            fallbackScript.onerror = function() {
+                addDebugLine(`Both scripts failed to load`, 'error');
+            };
+            document.head.appendChild(fallbackScript);
+        };
+        
+        document.head.appendChild(script);
     }
 
     // Initialize
