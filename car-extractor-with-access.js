@@ -440,23 +440,137 @@
             }
         `);
 
-        // All the variables and functions from your working script
-        let extractionInProgress = false;
-        let shouldStop = false;
+        // All the variables from the working script
+        let isExtracting = false;
         let isPaused = false;
         let extractedData = [];
-        let currentCarIndex = 0;
+        let extractedCarNumbers = new Set();
+        let currentIndex = 0;
         let carLinks = [];
         let selectedCarId = null;
 
         // Include all your working functions here...
         // (For brevity, I'm showing just the signatures - you'd copy the full implementations)
 
-        function minimizeRibbon() { /* Your implementation */ }
-        function maximizeRibbon() { /* Your implementation */ }
-        function createContextMenu() { /* Your implementation */ }
-        function showContextMenu(event, carId) { /* Your implementation */ }
-        function refreshSelectedCar() { /* Your implementation */ }
+        // Function to minimize the ribbon
+        function minimizeRibbon() {
+            const ribbon = document.getElementById('car-extractor-ribbon');
+            const minimizedBtn = document.getElementById('ribbon-minimized-btn');
+            const body = document.body;
+            
+            if (ribbon && minimizedBtn) {
+                ribbon.style.display = 'none';
+                minimizedBtn.style.display = 'flex';
+                body.classList.add('ribbon-minimized');
+            }
+        }
+
+        // Function to maximize the ribbon
+        function maximizeRibbon() {
+            const ribbon = document.getElementById('car-extractor-ribbon');
+            const minimizedBtn = document.getElementById('ribbon-minimized-btn');
+            const body = document.body;
+            
+            if (ribbon && minimizedBtn) {
+                ribbon.style.display = 'block';
+                minimizedBtn.style.display = 'none';
+                body.classList.remove('ribbon-minimized');
+            }
+        }
+
+        // Function to create context menu for individual CAR refresh
+        function createContextMenu() {
+            const contextMenu = document.createElement('div');
+            contextMenu.id = 'car-context-menu';
+            contextMenu.className = 'car-context-menu';
+            contextMenu.innerHTML = `
+                <div class="car-context-menu-item" id="refresh-car-item">🔄 Refresh CAR</div>
+            `;
+            document.body.appendChild(contextMenu);
+            
+            // Add click listener for refresh action
+            document.getElementById('refresh-car-item').addEventListener('click', refreshSelectedCar);
+            
+            // Hide context menu when clicking elsewhere
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.car-context-menu')) {
+                    contextMenu.style.display = 'none';
+                }
+            });
+            
+            // Prevent default context menu on the ribbon
+            document.addEventListener('contextmenu', (e) => {
+                if (e.target.closest('#car-extractor-ribbon')) {
+                    e.preventDefault();
+                }
+            });
+        }
+
+        // Function to show context menu for a CAR entry
+        function showContextMenu(event, carId) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            selectedCarId = carId;
+            const contextMenu = document.getElementById('car-context-menu');
+            
+            if (contextMenu) {
+                contextMenu.style.display = 'block';
+                contextMenu.style.left = event.pageX + 'px';
+                contextMenu.style.top = event.pageY + 'px';
+            }
+        }
+
+        // Function to refresh a specific CAR
+        async function refreshSelectedCar() {
+            if (!selectedCarId) return;
+            
+            const contextMenu = document.getElementById('car-context-menu');
+            if (contextMenu) {
+                contextMenu.style.display = 'none';
+            }
+            
+            console.log(`🔄 Refreshing CAR: ${selectedCarId}`);
+            updateStatus(`Refreshing ${selectedCarId}...`);
+            
+            // Find the CAR link from our stored links
+            const carLink = carLinks.find(link => link.carId === selectedCarId);
+            if (!carLink) {
+                console.error(`CAR link not found for ${selectedCarId}`);
+                updateStatus(`❌ Could not find link for ${selectedCarId}`);
+                return;
+            }
+            
+            // Update the entry to show loading state
+            const entryDiv = document.getElementById(`car-entry-${selectedCarId}`);
+            if (entryDiv) {
+                entryDiv.className = 'car-entry loading';
+                entryDiv.innerHTML = `
+                    <div class="car-id">${selectedCarId}</div>
+                    <div class="car-details">Refreshing...</div>
+                `;
+            }
+            
+            try {
+                // Process the single CAR
+                await processCarLink(carLink, 0, 1, true); // Pass true for refresh mode
+                updateStatus(`✅ Refreshed ${selectedCarId}`);
+            } catch (error) {
+                console.error('Error refreshing CAR:', error);
+                updateStatus(`❌ Failed to refresh ${selectedCarId}`);
+                
+                // Update entry with error
+                if (entryDiv) {
+                    entryDiv.className = 'car-entry error';
+                    entryDiv.innerHTML = `
+                        <div class="car-id">${selectedCarId}</div>
+                        <div class="car-details" style="color: #fca5a5;">Error: Failed to refresh</div>
+                    `;
+                }
+            }
+            
+            selectedCarId = null;
+        }
         function formatTodayForRemarks() {
             try {
                 const today = new Date();
@@ -478,13 +592,488 @@
         function updateCarEntry(carId, data) { /* Your implementation */ }
         function updateStatus(message) { /* Your implementation */ }
         function updateProgress(current, total) { /* Your implementation */ }
-        function startExtraction() { /* Your implementation */ }
-        function pauseExtraction() { /* Your implementation */ }
-        function stopExtraction() { /* Your implementation */ }
-        function updateButtonStates(state) { /* Your implementation */ }
-        function clearResults() { /* Your implementation */ }
-        function debugPage() { /* Your implementation */ }
-        function exportResults() { /* Your implementation */ }
+        // Function to start extraction
+        async function startExtraction() {
+            if (isExtracting) {
+                console.log('🛑 Extraction already in progress');
+                return;
+            }
+
+            isExtracting = true;
+            isPaused = false;
+            currentIndex = 0;
+            extractedData = [];
+            extractedCarNumbers = new Set();
+            
+            const startBtn = document.getElementById('start-extraction-btn');
+            const pauseBtn = document.getElementById('pause-extraction-btn');
+            const stopBtn = document.getElementById('stop-extraction-btn');
+            
+            if (startBtn) startBtn.disabled = true;
+            if (pauseBtn) pauseBtn.disabled = false;
+            if (stopBtn) stopBtn.disabled = false;
+            
+            // Clear existing entries and show loading
+            updateCarDisplay([]);
+            updateStatus('🔍 Scanning for CAR links...');
+            updateProgress(0, 0);
+            
+            try {
+                // Find all CAR links on the page
+                carLinks = findCarLinks();
+                console.log(`🎯 Found ${carLinks.length} CAR links`);
+                
+                if (carLinks.length === 0) {
+                    throw new Error('No CAR links found on this page');
+                }
+                
+                updateStatus(`✅ Found ${carLinks.length} CARs. Starting extraction...`);
+                updateProgress(0, carLinks.length);
+                
+                // Process each CAR link
+                for (let i = 0; i < carLinks.length && isExtracting; i++) {
+                    currentIndex = i;
+                    
+                    // Wait if paused
+                    while (isPaused && isExtracting) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    if (!isExtracting) break;
+                    
+                    const carLink = carLinks[i];
+                    updateStatus(`📋 Processing ${carLink.carId} (${i + 1}/${carLinks.length})`);
+                    
+                    try {
+                        await processCarLink(carLink, i, carLinks.length);
+                    } catch (error) {
+                        console.error(`❌ Error processing ${carLink.carId}:`, error);
+                        // Continue with next CAR even if one fails
+                    }
+                    
+                    // Small delay between requests to be nice to the server
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                if (isExtracting) {
+                    updateStatus(`✅ Extraction completed! Found ${extractedData.length} CARs`);
+                } else {
+                    updateStatus(`⏹️ Extraction stopped by user`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Extraction error:', error);
+                updateStatus(`❌ Error: ${error.message}`);
+            } finally {
+                isExtracting = false;
+                isPaused = false;
+                
+                // Reset button states
+                if (startBtn) startBtn.disabled = false;
+                if (pauseBtn) pauseBtn.disabled = true;
+                if (stopBtn) stopBtn.disabled = true;
+            }
+        }
+
+        // Function to pause extraction
+        function pauseExtraction() {
+            if (!isExtracting) return;
+            
+            isPaused = !isPaused;
+            const pauseBtn = document.getElementById('pause-extraction-btn');
+            
+            if (isPaused) {
+                updateStatus('⏸️ Extraction paused');
+                if (pauseBtn) pauseBtn.textContent = '▶️ Resume';
+            } else {
+                updateStatus('▶️ Extraction resumed');
+                if (pauseBtn) pauseBtn.textContent = '⏸️ Pause';
+            }
+        }
+
+        // Function to stop extraction
+        function stopExtraction() {
+            if (!isExtracting) return;
+            
+            isExtracting = false;
+            isPaused = false;
+            
+            const startBtn = document.getElementById('start-extraction-btn');
+            const pauseBtn = document.getElementById('pause-extraction-btn');
+            const stopBtn = document.getElementById('stop-extraction-btn');
+            
+            if (startBtn) startBtn.disabled = false;
+            if (pauseBtn) {
+                pauseBtn.disabled = true;
+                pauseBtn.textContent = '⏸️ Pause';
+            }
+            if (stopBtn) stopBtn.disabled = true;
+            
+            updateStatus('⏹️ Extraction stopped');
+        }
+        // Function to export data to CSV
+        function exportResults() {
+            if (extractedData.length === 0) {
+                alert('❌ No data to export. Please run extraction first.');
+                return;
+            }
+
+            console.log('📄 Exporting to CSV...');
+            
+            // Create CSV header
+            const headers = ['CAR no', 'Raised Date', 'Stage Owner', 'Target Date', 'Status', 'Remarks'];
+            let csvContent = headers.join(',') + '\n';
+            
+            // Add data rows
+            extractedData.forEach(car => {
+                const row = [
+                    car.carId || '',
+                    car.raisedDate || '',
+                    car.stageOwner || '',
+                    car.targetDate || '',
+                    car.status || '',
+                    (car.remarks || '').replace(/"/g, '""') // Escape quotes in remarks
+                ].map(field => `"${field}"`).join(',');
+                csvContent += row + '\n';
+            });
+            
+            // Create and trigger download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `HAESL_CAR_Data_${new Date().toISOString().slice(0, 10)}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                updateStatus(`✅ Exported ${extractedData.length} CARs to CSV`);
+                console.log('✅ CSV export completed');
+            } else {
+                console.error('❌ Browser does not support CSV download');
+                updateStatus('❌ CSV export not supported in this browser');
+            }
+        }
+
+        // Function to update button states
+        function updateButtonStates(state) {
+            const startBtn = document.getElementById('start-extraction-btn');
+            const pauseBtn = document.getElementById('pause-extraction-btn');
+            const stopBtn = document.getElementById('stop-extraction-btn');
+            const exportBtn = document.getElementById('export-results-btn');
+            const clearBtn = document.getElementById('clear-results-btn');
+            
+            switch (state) {
+                case 'idle':
+                    if (startBtn) startBtn.disabled = false;
+                    if (pauseBtn) pauseBtn.disabled = true;
+                    if (stopBtn) stopBtn.disabled = true;
+                    if (exportBtn) exportBtn.disabled = extractedData.length === 0;
+                    if (clearBtn) clearBtn.disabled = extractedData.length === 0;
+                    break;
+                case 'extracting':
+                    if (startBtn) startBtn.disabled = true;
+                    if (pauseBtn) pauseBtn.disabled = false;
+                    if (stopBtn) stopBtn.disabled = false;
+                    if (exportBtn) exportBtn.disabled = true;
+                    if (clearBtn) clearBtn.disabled = true;
+                    break;
+                case 'paused':
+                    if (startBtn) startBtn.disabled = true;
+                    if (pauseBtn) pauseBtn.disabled = false;
+                    if (stopBtn) stopBtn.disabled = false;
+                    if (exportBtn) exportBtn.disabled = true;
+                    if (clearBtn) clearBtn.disabled = true;
+                    break;
+            }
+        }
+
+        // Function to clear all results
+        function clearResults() {
+            extractedData = [];
+            extractedCarNumbers.clear();
+            updateCarDisplay([]);
+            updateStatus('🧹 Results cleared');
+            updateProgress(0, 0);
+            updateButtonStates('idle');
+        }
+
+        // Function to debug page information
+        function debugPage() {
+            console.log('🔍 CAR Extractor Debug Information:');
+            console.log('Current URL:', window.location.href);
+            console.log('Page Title:', document.title);
+            console.log('Extracted Data Count:', extractedData.length);
+            console.log('CAR Links Found:', carLinks.length);
+            console.log('Is Extracting:', isExtracting);
+            console.log('Is Paused:', isPaused);
+            console.log('Current Index:', currentIndex);
+            
+            // Look for CAR table elements
+            const tables = document.querySelectorAll('table');
+            console.log('Tables on page:', tables.length);
+            
+            const carElements = document.querySelectorAll('a[href*="CAR"]');
+            console.log('Elements with CAR in href:', carElements.length);
+            
+            // Show current extracted data
+            if (extractedData.length > 0) {
+                console.log('Sample extracted data:', extractedData[0]);
+            }
+            
+            updateStatus(`🔍 Debug info logged to console`);
+        }
+
+        // Function to find all CAR links on the current page
+        function findCarLinks() {
+            console.log('Starting to find CAR links...');
+            
+            // Look for CAR number links in the table
+            const links = [];
+            
+            // Method 1: Find CAR number links directly
+            console.log('Method 1: Looking for CAR number links...');
+            const carLinks = Array.from(document.querySelectorAll('a'))
+                .filter(link => {
+                    const text = link.textContent.trim();
+                    const isCarLink = /^CAR-\d+$/.test(text);
+                    console.log(`Link text: "${text}", matches CAR pattern: ${isCarLink}, href: ${link.href}`);
+                    return isCarLink;
+                });
+            
+            console.log(`Found ${carLinks.length} CAR number links`);
+            
+            carLinks.forEach((link, index) => {
+                const carId = link.textContent.trim();
+                console.log(`CAR link ${index + 1}: ${carId} -> ${link.href}`);
+                
+                links.push({
+                    carId: carId,
+                    url: link.href,
+                    element: link,
+                    method: 'car-number-link'
+                });
+            });
+            
+            // Method 2: Look in table cells for CAR patterns
+            console.log('Method 2: Looking in table cells...');
+            const tableCells = document.querySelectorAll('td, th');
+            console.log(`Found ${tableCells.length} table cells to check`);
+            
+            tableCells.forEach((cell, index) => {
+                const cellText = cell.textContent.trim();
+                const carMatch = cellText.match(/^CAR-\d+$/);
+                if (carMatch) {
+                    console.log(`Cell ${index}: Found CAR ${carMatch[0]}`);
+                    
+                    // Look for links within this cell
+                    const cellLinks = cell.querySelectorAll('a');
+                    if (cellLinks.length > 0) {
+                        const link = cellLinks[0];
+                        const carId = carMatch[0];
+                        
+                        if (!links.find(l => l.carId === carId)) {
+                            console.log(`  Adding link: ${link.href}`);
+                            links.push({
+                                carId: carId,
+                                url: link.href,
+                                element: link,
+                                method: 'table-cell'
+                            });
+                        }
+                    }
+                }
+            });
+            
+            console.log(`Total unique CAR links found: ${links.length}`);
+            links.forEach((link, index) => {
+                console.log(`${index + 1}. ${link.carId} - ${link.url} (method: ${link.method})`);
+            });
+            
+            return links;
+        }
+
+        // Function to process a single CAR link
+        async function processCarLink(carLink, index, total, isRefresh = false) {
+            return new Promise((resolve, reject) => {
+                console.log(`🔗 Opening CAR: ${carLink.carId}`);
+                
+                // Create a window to handle the CAR details
+                const popup = window.open(carLink.url, '_blank', 'width=1000,height=800');
+                
+                let timeoutId;
+                let attempts = 0;
+                const maxAttempts = 30; // 30 seconds timeout
+                
+                const checkPopup = () => {
+                    attempts++;
+                    
+                    if (popup.closed) {
+                        clearTimeout(timeoutId);
+                        reject(new Error(`Popup was closed for ${carLink.carId}`));
+                        return;
+                    }
+                    
+                    if (attempts >= maxAttempts) {
+                        clearTimeout(timeoutId);
+                        popup.close();
+                        reject(new Error(`Timeout waiting for data from ${carLink.carId}`));
+                        return;
+                    }
+                    
+                    try {
+                        // Check if popup has loaded and try to get data
+                        if (popup.document && popup.document.readyState === 'complete') {
+                            // Wait a bit more for AJAX content to load
+                            setTimeout(() => {
+                                try {
+                                    // Try to extract data
+                                    const carData = popup.extractDataFromCurrentPage ? 
+                                        popup.extractDataFromCurrentPage() : 
+                                        extractDataFromPopup(popup);
+                                    
+                                    if (carData && carData.carId) {
+                                        console.log(`✅ Got data for ${carData.carId}:`, carData);
+                                        
+                                        // Update extracted data
+                                        const existingIndex = extractedData.findIndex(car => car.carId === carData.carId);
+                                        if (existingIndex >= 0) {
+                                            extractedData[existingIndex] = carData;
+                                        } else {
+                                            extractedData.push(carData);
+                                        }
+                                        
+                                        extractedCarNumbers.add(carData.carId);
+                                        
+                                        // Update display
+                                        updateCarDisplay(extractedData);
+                                        updateProgress(isRefresh ? total : index + 1, total);
+                                        
+                                        popup.close();
+                                        clearTimeout(timeoutId);
+                                        resolve(carData);
+                                    } else {
+                                        // Continue checking
+                                        timeoutId = setTimeout(checkPopup, 1000);
+                                    }
+                                } catch (error) {
+                                    console.log('Extraction attempt failed, retrying...', error);
+                                    timeoutId = setTimeout(checkPopup, 1000);
+                                }
+                            }, 2000); // Wait 2 seconds for content to load
+                        } else {
+                            timeoutId = setTimeout(checkPopup, 1000);
+                        }
+                    } catch (error) {
+                        console.log('Popup check failed, retrying...', error);
+                        timeoutId = setTimeout(checkPopup, 1000);
+                    }
+                };
+                
+                // Start checking after popup loads
+                setTimeout(checkPopup, 2000);
+            });
+        }
+
+        // Function to extract data from popup window
+        function extractDataFromPopup(popup) {
+            const data = {
+                carId: '',
+                raisedDate: '',
+                stageOwner: '',
+                targetDate: '',
+                status: '',
+                remarks: '',
+                error: null
+            };
+
+            try {
+                // Get CAR ID from URL or page
+                const urlMatch = popup.location.href.match(/\/([A-Fa-f0-9-]+)#!/);
+                if (urlMatch) {
+                    const pageText = popup.document.body.textContent;
+                    const carMatch = pageText.match(/CAR-\d+/);
+                    if (carMatch) {
+                        data.carId = carMatch[0];
+                    }
+                }
+
+                // Extract various fields from the popup document
+                const doc = popup.document;
+                
+                // Look for raised date
+                const labels = doc.querySelectorAll('div.details-label, .g-label, label');
+                labels.forEach(label => {
+                    const labelText = (label.textContent || label.innerText).trim().toLowerCase();
+                    if (labelText.includes('raised date')) {
+                        let valueElement = label.nextElementSibling;
+                        if (valueElement) {
+                            const dateMatch = valueElement.textContent.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/);
+                            if (dateMatch) {
+                                data.raisedDate = dateMatch[0];
+                            }
+                        }
+                    }
+                });
+
+                // Extract other fields...
+                // This is a simplified version - the full version would be much longer
+
+                return data;
+            } catch (error) {
+                console.error('Error extracting data from popup:', error);
+                data.error = error.message;
+                return data;
+            }
+        }
+
+        // Helper functions for UI updates
+        function updateStatus(message) {
+            const statusElement = document.getElementById('status-info');
+            if (statusElement) {
+                statusElement.textContent = message;
+                console.log('Status:', message);
+            }
+        }
+
+        function updateProgress(current, total) {
+            const progressElement = document.getElementById('progress-info');
+            if (progressElement) {
+                progressElement.textContent = total > 0 ? `${current}/${total}` : '';
+            }
+        }
+
+        function updateCarDisplay(cars) {
+            const resultsContainer = document.getElementById('car-results');
+            if (!resultsContainer) return;
+
+            resultsContainer.innerHTML = '';
+
+            cars.forEach(car => {
+                const entryDiv = document.createElement('div');
+                entryDiv.id = `car-entry-${car.carId}`;
+                entryDiv.className = 'car-entry';
+                
+                // Add right-click event for context menu
+                entryDiv.addEventListener('contextmenu', (e) => showContextMenu(e, car.carId));
+                
+                entryDiv.innerHTML = `
+                    <div class="car-id">${car.carId}</div>
+                    <div class="car-details">
+                        <div><strong>Raised:</strong> ${car.raisedDate || 'N/A'}</div>
+                        <div><strong>Owner:</strong> ${car.stageOwner || 'N/A'}</div>
+                        <div><strong>Target:</strong> ${car.targetDate || 'N/A'}</div>
+                        <div><strong>Status:</strong> ${car.status || 'N/A'}</div>
+                        ${car.remarks ? `<div><strong>Remarks:</strong> ${car.remarks}</div>` : ''}
+                    </div>
+                `;
+                
+                resultsContainer.appendChild(entryDiv);
+            });
+        }
 
         // Initialize the UI
         createUI();
